@@ -5,81 +5,68 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/models"
-	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/pkg/auth"
 )
 
-// JWTAuth validates JWT tokens and adds user info to the request context
-func JWTAuth() gin.HandlerFunc {
+type Claims struct {
+	UserID string `json:"userId"`
+	jwt.RegisteredClaims
+}
+
+// JWTAuth validates the JWT token in the Authorization header
+func JWTAuth(config *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
 				http.StatusUnauthorized,
-				"Authorization header is required",
+				"Authorization required",
 				nil,
 			))
 			return
 		}
 
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		// Check Bearer token format
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
 				http.StatusUnauthorized,
-				"Invalid token format",
+				"Invalid authorization format",
 				nil,
 			))
 			return
 		}
 
-		claims, err := auth.ValidateToken(tokenParts[1])
+		// Parse and validate token using v5 of the jwt package
+		token, err := jwt.ParseWithClaims(parts[1], &Claims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(config.Auth.JWTSecret), nil
+		})
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
 				http.StatusUnauthorized,
 				"Invalid or expired token",
-				err.Error(),
+				nil,
 			))
 			return
 		}
 
-		// Add user info to context
+		// Extract user details from token
+		claims, ok := token.Claims.(*Claims)
+		if !ok || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
+				http.StatusUnauthorized,
+				"Invalid or expired token",
+				nil,
+			))
+			return
+		}
+
+		// Add user ID to context for downstream services
 		c.Set("userID", claims.UserID)
-		c.Set("userRole", claims.Role)
-
-		c.Next()
-	}
-}
-
-// RBACMiddleware restricts access based on user role
-func RBACMiddleware(allowedRoles []string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userRole, exists := c.Get("userRole")
-		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, models.NewErrorResponse(
-				http.StatusForbidden,
-				"Role information not found",
-				nil,
-			))
-			return
-		}
-
-		role := userRole.(string)
-		allowed := false
-		for _, r := range allowedRoles {
-			if r == role {
-				allowed = true
-				break
-			}
-		}
-
-		if !allowed {
-			c.AbortWithStatusJSON(http.StatusForbidden, models.NewErrorResponse(
-				http.StatusForbidden,
-				"Insufficient permissions",
-				nil,
-			))
-			return
-		}
+		// Add user ID to headers for microservices
+		c.Request.Header.Set("X-User-ID", claims.UserID)
 
 		c.Next()
 	}

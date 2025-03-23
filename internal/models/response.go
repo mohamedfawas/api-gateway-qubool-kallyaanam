@@ -1,6 +1,6 @@
 package models
 
-// Response represents the standard API response format
+// Response provides a standardized structure for all API responses
 type Response struct {
 	Status  int         `json:"status"`
 	Message string      `json:"message"`
@@ -8,7 +8,7 @@ type Response struct {
 	Error   interface{} `json:"error,omitempty"`
 }
 
-// NewSuccessResponse creates a standard success response
+// NewSuccessResponse creates a success response
 func NewSuccessResponse(status int, message string, data interface{}) Response {
 	return Response{
 		Status:  status,
@@ -17,11 +17,11 @@ func NewSuccessResponse(status int, message string, data interface{}) Response {
 	}
 }
 
-// NewErrorResponse creates a standard error response
-func NewErrorResponse(status int, message string, errorDetails interface{}) Response {
+// NewErrorResponse creates an error response
+func NewErrorResponse(status int, message string, err interface{}) Response {
 	return Response{
 		Status:  status,
 		Message: message,
-		Error:   errorDetails,
+		Error:   err,
 	}
 }

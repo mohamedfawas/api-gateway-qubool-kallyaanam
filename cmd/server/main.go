@@ -17,49 +17,57 @@ import (
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+	cfg := config.LoadConfig()
+
+	// Validate essential config
+	if cfg.Auth.JWTSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
-	// Set Gin mode
-	if cfg.Server.Environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
-	// Create the Gin router
+	// Create the router
 	router := gin.New()
 
-	// Apply middleware
+	// Apply global middleware
 	router.Use(gin.Recovery())
 	router.Use(middleware.Logger())
 	router.Use(middleware.CORS())
 	router.Use(middleware.ErrorHandler())
 
-	// Health check endpoint
+	// Create proxy handler for services
+	proxyHandler, err := handlers.NewProxyHandler(cfg.Services)
+	if err != nil {
+		log.Fatalf("Failed to initialize proxy handler: %v", err)
+	}
+
+	// Health check endpoint for Kubernetes
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// Create proxy handler
-	proxyHandler, err := handlers.NewProxyHandler(cfg)
-	if err != nil {
-		log.Fatalf("Failed to create proxy handler: %v", err)
-	}
+	// Auth service routes - no auth required
+	authRoutes := router.Group("/auth")
+	authRoutes.Any("/*path", proxyHandler.ProxyRequest("auth"))
 
-	// Setup routes
-	handlers.SetupRoutes(router, proxyHandler)
+	// Protected routes - require auth
+	protectedRoutes := router.Group("")
+	protectedRoutes.Use(middleware.JWTAuth(cfg))
+
+	// User service routes
+	protectedRoutes.Any("/user/*path", proxyHandler.ProxyRequest("user"))
+
+	// Admin service routes
+	protectedRoutes.Any("/admin/*path", proxyHandler.ProxyRequest("admin"))
 
 	// Create HTTP server
-	srv := &http.Server{
+	server := &http.Server{
 		Addr:    ":" + cfg.Server.Port,
 		Handler: router,
 	}
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Starting server on port %s", cfg.Server.Port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("Starting API Gateway on port %s", cfg.Server.Port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
@@ -68,12 +76,13 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
 
-	// Give server time to finish ongoing requests
+	// Graceful shutdown
+	log.Println("Shutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+
+	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
