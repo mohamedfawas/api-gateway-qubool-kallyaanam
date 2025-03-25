@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,64 +12,77 @@ import (
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/models"
 )
 
+const (
+	authorizationHeader = "Authorization"
+	bearerPrefix        = "Bearer"
+	// Use a unique context key to avoid collisions
+	userIDContextKey   = "userID"
+	userIDHeaderKey    = "X-User-ID"
+	errorAuthRequired  = "Authorization required"
+	errorInvalidFormat = "Invalid authorization format"
+	errorInvalidToken  = "Invalid or expired token"
+	errorMissingUserID = "User ID not found in token"
+)
+
 type Claims struct {
 	UserID string `json:"userId"`
 	jwt.RegisteredClaims
 }
 
-// JWTAuth validates the JWT token in the Authorization header
-func JWTAuth(config *config.Config) gin.HandlerFunc {
+func extractToken(authHeader string) (string, error) {
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 {
+		return "", errors.New("invalid authorization header format")
+	}
+	scheme := parts[0]
+	if !strings.EqualFold(scheme, bearerPrefix) {
+		return "", errors.New("invalid authorization scheme")
+	}
+	token := strings.TrimSpace(parts[1])
+	if token == "" {
+		return "", errors.New("token is empty")
+	}
+	return token, nil
+}
+
+func JWTAuth(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
-				http.StatusUnauthorized,
-				"Authorization required",
-				nil,
-			))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(http.StatusUnauthorized, errorAuthRequired, nil))
 			return
 		}
 
-		// Check Bearer token format
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
-				http.StatusUnauthorized,
-				"Invalid authorization format",
-				nil,
-			))
+		tokenString, err := extractToken(authHeader)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(http.StatusUnauthorized, errorInvalidFormat, nil))
 			return
 		}
 
-		// Parse and validate token using v5 of the jwt package
-		token, err := jwt.ParseWithClaims(parts[1], &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			return []byte(config.Auth.JWTSecret), nil
+		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(cfg.Auth.JWTSecret), nil
 		})
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
-				http.StatusUnauthorized,
-				"Invalid or expired token",
-				nil,
-			))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(http.StatusUnauthorized, errorInvalidToken, nil))
 			return
 		}
 
-		// Extract user details from token
 		claims, ok := token.Claims.(*Claims)
 		if !ok || !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(
-				http.StatusUnauthorized,
-				"Invalid or expired token",
-				nil,
-			))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(http.StatusUnauthorized, errorInvalidToken, nil))
 			return
 		}
 
-		// Add user ID to context for downstream services
-		c.Set("userID", claims.UserID)
-		// Add user ID to headers for microservices
-		c.Request.Header.Set("X-User-ID", claims.UserID)
+		if claims.UserID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(http.StatusUnauthorized, errorMissingUserID, nil))
+			return
+		}
 
+		c.Set(userIDContextKey, claims.UserID)
+		c.Request.Header.Set(userIDHeaderKey, claims.UserID)
 		c.Next()
 	}
 }

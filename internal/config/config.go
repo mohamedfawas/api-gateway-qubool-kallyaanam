@@ -1,59 +1,52 @@
 package config
 
 import (
+	"fmt"
 	"log"
-	"os"
-	"strings"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
-type Config struct {
-	Server struct {
-		Port string
-	}
-	Services map[string]string
-	Auth     struct {
-		JWTSecret string
-	}
+type ServerConfig struct {
+	Port string `mapstructure:"port"`
 }
 
-// LoadConfig loads configuration from environment variables
-func LoadConfig() *Config {
-	// Load .env file if it exists
-	err := godotenv.Load()
-	if err != nil {
-		// Just log the error but continue - it's not fatal if .env doesn't exist
-		log.Println("Warning: .env file not found. Using environment variables only.")
-	}
+type AuthConfig struct {
+	JWTSecret string `mapstructure:"jwt_secret"`
+}
 
-	config := &Config{
-		Services: make(map[string]string),
-	}
+type Config struct {
+	Server   ServerConfig      `mapstructure:"server"`
+	Services map[string]string `mapstructure:"services"`
+	Auth     AuthConfig        `mapstructure:"auth"`
+}
 
-	// Server config
-	config.Server.Port = getEnv("PORT", "8080")
+func LoadConfig(configPath string) (*Config, error) {
+	viper.SetConfigFile(configPath) // Directly set the config file path
 
-	// Service endpoints - dynamically load any service with SERVICE_ prefix
-	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, "SERVICE_") {
-			parts := strings.SplitN(env, "=", 2)
-			if len(parts) == 2 {
-				serviceName := strings.ToLower(strings.TrimPrefix(parts[0], "SERVICE_"))
-				config.Services[serviceName] = parts[1]
-			}
+	viper.SetDefault("server.port", "8080")
+	viper.SetDefault("auth.jwt_secret", "")
+
+	// Handle config file reading with proper error checking
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Printf("Config file not found: %v. Using defaults and environment variables.", err)
+		} else {
+			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 	}
 
-	// Auth config
-	config.Auth.JWTSecret = getEnv("JWT_SECRET", "")
+	viper.AutomaticEnv() // Ensure env vars are read after config file
 
-	return config
-}
-
-func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("unable to decode into struct: %w", err)
 	}
-	return defaultValue
+
+	// Ensure Services map is initialized
+	if config.Services == nil {
+		config.Services = make(map[string]string)
+	}
+
+	return &config, nil
 }

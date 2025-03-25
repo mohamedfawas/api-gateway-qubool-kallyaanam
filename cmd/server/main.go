@@ -10,28 +10,46 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/handlers"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/middleware"
 )
 
 func main() {
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: Error loading .env file: %v", err)
+	}
+
+	// Set Gin mode based on environment
+	env := os.Getenv("ENV")
+	if env == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	// Load configuration
-	cfg := config.LoadConfig()
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		log.Fatal("CONFIG_PATH environment variable is required")
+	}
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Validate essential config
 	if cfg.Auth.JWTSecret == "" {
 		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
-	// Create the router
-	router := gin.New()
+	// Create the router with default middleware (Logger and Recovery)
+	router := gin.Default()
 
 	// Apply global middleware
-	router.Use(gin.Recovery())
-	router.Use(middleware.Logger())
 	router.Use(middleware.CORS())
-	router.Use(middleware.ErrorHandler())
+	router.Use(middleware.SimpleErrorHandler())
 
 	// Create proxy handler for services
 	proxyHandler, err := handlers.NewProxyHandler(cfg.Services)

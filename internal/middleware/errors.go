@@ -7,17 +7,17 @@ import (
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/models"
 )
 
-// ErrorHandler provides global error handling
-func ErrorHandler() gin.HandlerFunc {
+// SimpleErrorHandler provides global error handling
+func SimpleErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
 		// Check if there were any errors during request processing
 		if len(c.Errors) > 0 {
-			// Take the last error
-			err := c.Errors.Last()
+			// Use the last error as the response error
+			lastErr := c.Errors.Last()
 
-			// Return appropriate status code based on error
+			// Determine HTTP status code
 			statusCode := http.StatusInternalServerError
 			if c.Writer.Status() != http.StatusOK {
 				statusCode = c.Writer.Status()
@@ -26,17 +26,17 @@ func ErrorHandler() gin.HandlerFunc {
 			c.JSON(statusCode, models.NewErrorResponse(
 				statusCode,
 				"Request failed",
-				err.Error(),
+				lastErr.Error(),
 			))
 			return
 		}
 
-		// If no response has been sent and we've reached this point
+		// If no handler wrote a response, return 404
 		if c.Writer.Size() == -1 {
 			c.JSON(http.StatusNotFound, models.NewErrorResponse(
 				http.StatusNotFound,
 				"Resource not found",
-				nil,
+				"",
 			))
 		}
 	}
