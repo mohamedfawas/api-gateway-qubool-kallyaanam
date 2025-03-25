@@ -59,13 +59,13 @@ func (a *App) SetupRoutes(proxyHandler *handlers.ProxyHandler) {
 // SetupServer initializes the HTTP server
 func (a *App) SetupServer() *http.Server {
 	// Create proxy handler for services
-	proxyHandler, err := handlers.NewProxyHandler(a.config.Services)
+	proxyHandler, err := handlers.NewProxyHandler(a.config.Services) // creates a new proxy handler instance with the services map from the configuration
 	if err != nil {
 		log.Fatalf("Failed to initialize proxy handler: %v", err)
 	}
 
 	// Setup routes
-	a.SetupRoutes(proxyHandler)
+	a.SetupRoutes(proxyHandler) // sets up the routes for the application using the proxy handler
 
 	// Return configured HTTP server
 	return &http.Server{

@@ -19,7 +19,7 @@ type ProxyHandler struct {
 
 // NewProxyHandler creates a new proxy handler with service URLs.
 func NewProxyHandler(services map[string]string) (*ProxyHandler, error) {
-	proxyService, err := service.NewProxyService(services)
+	proxyService, err := service.NewProxyService(services) // creates a new proxy service instance with the provided services map
 	if err != nil {
 		return nil, err
 	}

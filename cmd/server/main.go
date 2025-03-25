@@ -44,17 +44,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	defer logger.Sync()
+	defer logger.Sync() // ensures that all pending log messages are flushed to the output destination
 
-	// Replace log statements with structured logging
 	logger.Info("Starting API Gateway",
 		zap.String("port", cfg.Server.Port),
 		zap.String("env", os.Getenv("ENV")),
 	)
 
 	// Initialize and start the application
-	application := app.NewApp(cfg)
-	server := application.SetupServer()
+	application := app.NewApp(cfg)      // creates a new application instance with the loaded configuration
+	server := application.SetupServer() // sets up the server with the application's configuration
 
 	// Start server in a goroutine
 	go func() {
@@ -65,7 +64,7 @@ func main() {
 	}()
 
 	// Wait for interrupt signal
-	quit := make(chan os.Signal, 1)
+	quit := make(chan os.Signal, 1) // creates a channel to receive OS signals
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
