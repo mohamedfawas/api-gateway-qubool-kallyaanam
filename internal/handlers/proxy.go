@@ -41,14 +41,15 @@ func (h *ProxyHandler) ProxyRequest(serviceName string) gin.HandlerFunc {
 			return
 		}
 
-		proxy := httputil.NewSingleHostReverseProxy(serviceURL)
-		originalDirector := proxy.Director
+		proxy := httputil.NewSingleHostReverseProxy(serviceURL) //  forwards requests to the specified service URL
+
+		originalDirector := proxy.Director // 'Director' function that modifies the outbound request before it’s sent
 		proxy.Director = func(req *http.Request) {
 			originalDirector(req)
-			req.URL.Scheme = serviceURL.Scheme
-			req.URL.Host = serviceURL.Host
-			req.URL.Path = serviceURL.Path + c.Request.URL.Path
-			if clientIP := c.ClientIP(); clientIP != "" {
+			req.URL.Scheme = serviceURL.Scheme                  // sets the protocol (either http or https) to match that of the target service , If serviceURL is https://api.example.com/v1, the scheme becomes https
+			req.URL.Host = serviceURL.Host                      // sets the host to the host part of the target service URL, If serviceURL is https://api.example.com/v1, the host becomes api.example.com
+			req.URL.Path = serviceURL.Path + c.Request.URL.Path // appends the original request path to the target service path, If the original request path is /users/123, the final path becomes /api/v1/users/123
+			if clientIP := c.ClientIP(); clientIP != "" {       // checks if the client’s IP address is available. If it is, the IP is added to the request headers under X-Forwarded-For
 				req.Header.Set("X-Forwarded-For", clientIP)
 			}
 		}
