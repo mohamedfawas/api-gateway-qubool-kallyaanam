@@ -9,23 +9,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/app"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
-	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/handlers"
-	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/middleware"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/pkg/logging"
+	"go.uber.org/zap"
 )
 
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Warning: Error loading .env file: %v", err)
-	}
-
-	// Set Gin mode based on environment
-	env := os.Getenv("ENV")
-	if env == "production" {
-		gin.SetMode(gin.ReleaseMode)
 	}
 
 	// Load configuration
@@ -44,43 +38,23 @@ func main() {
 		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
-	// Create the router with default middleware (Logger and Recovery)
-	router := gin.Default()
-
-	// Apply global middleware
-	router.Use(middleware.CORS())
-	router.Use(middleware.SimpleErrorHandler())
-
-	// Create proxy handler for services
-	proxyHandler, err := handlers.NewProxyHandler(cfg.Services)
+	// Initialize logger
+	isProd := os.Getenv("ENV") == "production"
+	logger, err := logging.Initialize(isProd)
 	if err != nil {
-		log.Fatalf("Failed to initialize proxy handler: %v", err)
+		log.Fatalf("Failed to initialize logger: %v", err)
 	}
+	defer logger.Sync()
 
-	// Health check endpoint for Kubernetes
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
+	// Replace log statements with structured logging
+	logger.Info("Starting API Gateway",
+		zap.String("port", cfg.Server.Port),
+		zap.String("env", os.Getenv("ENV")),
+	)
 
-	// Auth service routes - no auth required
-	authRoutes := router.Group("/auth")
-	authRoutes.Any("/*path", proxyHandler.ProxyRequest("auth"))
-
-	// Protected routes - require auth
-	protectedRoutes := router.Group("")
-	protectedRoutes.Use(middleware.JWTAuth(cfg))
-
-	// User service routes
-	protectedRoutes.Any("/user/*path", proxyHandler.ProxyRequest("user"))
-
-	// Admin service routes
-	protectedRoutes.Any("/admin/*path", proxyHandler.ProxyRequest("admin"))
-
-	// Create HTTP server
-	server := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: router,
-	}
+	// Initialize and start the application
+	application := app.NewApp(cfg)
+	server := application.SetupServer()
 
 	// Start server in a goroutine
 	go func() {

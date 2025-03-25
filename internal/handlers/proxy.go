@@ -4,35 +4,36 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/service"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/pkg/logging"
+	"go.uber.org/zap"
 )
 
 // ProxyHandler handles forwarding requests to microservices.
 type ProxyHandler struct {
-	serviceURLs map[string]*url.URL
+	proxyService service.ProxyService
+	logger       *zap.Logger
 }
 
 // NewProxyHandler creates a new proxy handler with service URLs.
 func NewProxyHandler(services map[string]string) (*ProxyHandler, error) {
-	serviceURLs := make(map[string]*url.URL)
-	for name, urlStr := range services {
-		serviceURL, err := url.Parse(urlStr)
-		if err != nil {
-			return nil, err
-		}
-		serviceURLs[name] = serviceURL
+	proxyService, err := service.NewProxyService(services)
+	if err != nil {
+		return nil, err
 	}
+
 	return &ProxyHandler{
-		serviceURLs: serviceURLs,
+		proxyService: proxyService,
+		logger:       logging.Logger(),
 	}, nil
 }
 
 // ProxyRequest forwards a request to the specified service.
 func (h *ProxyHandler) ProxyRequest(serviceName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		serviceURL, exists := h.serviceURLs[serviceName]
+		serviceURL, exists := h.proxyService.GetServiceURL(serviceName)
 		if !exists {
 			// Only add the error to the context, don't respond immediately
 			c.Error(fmt.Errorf("service configuration not found: %s", serviceName))
@@ -53,6 +54,12 @@ func (h *ProxyHandler) ProxyRequest(serviceName string) gin.HandlerFunc {
 		}
 
 		proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+			// Log the error
+			h.logger.Error("proxy error",
+				zap.String("service", serviceName),
+				zap.Error(err),
+			)
+
 			// Only add the error to the context, don't respond immediately
 			c.Error(fmt.Errorf("proxy error to %s: %v", serviceName, err))
 			// Setting status code to make sure SimpleErrorHandler knows it's a bad gateway

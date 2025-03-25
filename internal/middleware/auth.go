@@ -10,6 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/models"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/pkg/logging"
+	"go.uber.org/zap"
 )
 
 const (
@@ -46,9 +48,14 @@ func extractToken(authHeader string) (string, error) {
 }
 
 func JWTAuth(cfg *config.Config) gin.HandlerFunc {
+	logger := logging.Logger()
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(authorizationHeader)
 		if authHeader == "" {
+			logger.Info("auth failure: missing authorization header",
+				zap.String("path", c.Request.URL.Path),
+				zap.String("method", c.Request.Method),
+			)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, models.NewErrorResponse(http.StatusUnauthorized, errorAuthRequired, nil))
 			return
 		}
