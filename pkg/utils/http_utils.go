@@ -22,7 +22,7 @@ func ExtractBearerToken(authHeader string) (string, error) {
 	return token, nil
 }
 
-// TrimPath removes leading slash if present
+// TrimPath removes leading slash if present, would convert "//example" to "example"
 func TrimPath(path string) string {
-	return strings.TrimPrefix(path, "/")
+	return strings.TrimLeft(path, "/")
 }
