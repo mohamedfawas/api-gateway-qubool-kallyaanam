@@ -31,6 +31,22 @@ func NewProxyHandler(services map[string]string) (*ProxyHandler, error) {
 }
 
 // ProxyRequest forwards a request to the specified service.
+// @Summary Proxy request to a microservice
+// @Description Forwards the incoming request to the specified microservice
+// @Tags proxy
+// @Accept json
+// @Produce json
+// @Param serviceName path string true "Name of the service to proxy to"
+// @Param path path string true "Path to forward to the service"
+// @Success 200 {object} interface{} "Successful response from the service"
+// @Failure 400 {object} models.Response "Bad request"
+// @Failure 401 {object} models.Response "Unauthorized"
+// @Failure 404 {object} models.Response "Service not found"
+// @Failure 502 {object} models.Response "Bad gateway"
+// @Router /{serviceName}/{path} [get]
+// @Security BearerAuth
+
+// ProxyRequest forwards a request to the specified service.
 func (h *ProxyHandler) ProxyRequest(serviceName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		serviceURL, exists := h.proxyService.GetServiceURL(serviceName)

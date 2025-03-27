@@ -9,6 +9,7 @@ import (
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/handlers"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/middleware"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/swagger"
 )
 
 // App represents the application
@@ -35,11 +36,22 @@ func (a *App) SetupRoutes(proxyHandler *handlers.ProxyHandler) {
 	// Apply global middleware
 	a.router.Use(middleware.CORS())
 	a.router.Use(middleware.SimpleErrorHandler())
+	// Add rate limiting - 100 requests per second with burst of 200
+	a.router.Use(middleware.RateLimit(100, 200))
 
-	// Health check endpoint for Kubernetes
+	// Setup health check endpoint with Swagger annotation
+	// @Summary API health check
+	// @Description Returns OK status if API is running
+	// @Tags health
+	// @Produce json
+	// @Success 200 {object} map[string]string
+	// @Router /health [get]
 	a.router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Setup Swagger documentation routes
+	swagger.SetupSwaggerRoutes(a.router)
 
 	// Auth service routes - no auth required
 	authRoutes := a.router.Group("/auth")

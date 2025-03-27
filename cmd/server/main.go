@@ -1,3 +1,24 @@
+// Package main API Gateway for Qubool Kallyaanam
+//
+// @title           Qubool Kallyaanam API Gateway
+// @version         1.0
+// @description     A microservice gateway for the Qubool Kallyaanam application
+//
+// @contact.name   API Support
+// @contact.url    https://github.com/mohamedfawas/api-gateway-qubool-kallyaanam
+// @contact.email  support@example.com
+//
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+//
+// @host      localhost:8080
+// @BasePath  /
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and the JWT token.
+
 package main
 
 import (
@@ -10,6 +31,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	_ "github.com/mohamedfawas/api-gateway-qubool-kallyaanam/docs"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/app"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/pkg/logging"
