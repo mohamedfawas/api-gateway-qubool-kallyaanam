@@ -1,24 +1,4 @@
-// Package main API Gateway for Qubool Kallyaanam
-//
-// @title           Qubool Kallyaanam API Gateway
-// @version         1.0
-// @description     A microservice gateway for the Qubool Kallyaanam application
-//
-// @contact.name   API Support
-// @contact.url    https://github.com/mohamedfawas/api-gateway-qubool-kallyaanam
-// @contact.email  support@example.com
-//
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
-//
-// @host      localhost:8080
-// @BasePath  /
-//
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-// @description Type "Bearer" followed by a space and the JWT token.
-
+// api-gateway-qubool-kallyaanam/cmd/main.go
 package main
 
 import (
@@ -30,74 +10,137 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
-	_ "github.com/mohamedfawas/api-gateway-qubool-kallyaanam/docs"
-	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/app"
-	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
-	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/pkg/logging"
-	"go.uber.org/zap"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: Error loading .env file: %v", err)
+	router := gin.Default()
+
+	// Health Check endpoint
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "UP",
+			"service": "api-gateway",
+			"version": "0.1.0",
+		})
+	})
+
+	// Route definitions for other services
+	router.GET("/auth/health", func(c *gin.Context) {
+		authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+		if authServiceURL == "" {
+			authServiceURL = "http://auth-service:8081" // Default in Docker
+		}
+
+		resp, err := http.Get(authServiceURL + "/health")
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "DOWN",
+				"service": "auth-service",
+				"error":   err.Error(),
+			})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "DOWN",
+				"service": "auth-service",
+				"code":    resp.StatusCode,
+			})
+			return
+		}
+
+		c.Status(resp.StatusCode)
+		c.Writer.Write([]byte("Auth Service is UP"))
+	})
+
+	router.GET("/user/health", func(c *gin.Context) {
+		userServiceURL := os.Getenv("USER_SERVICE_URL")
+		if userServiceURL == "" {
+			userServiceURL = "http://user-service:8082" // Default in Docker
+		}
+
+		resp, err := http.Get(userServiceURL + "/health")
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "DOWN",
+				"service": "user-service",
+				"error":   err.Error(),
+			})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "DOWN",
+				"service": "user-service",
+				"code":    resp.StatusCode,
+			})
+			return
+		}
+
+		c.Status(resp.StatusCode)
+		c.Writer.Write([]byte("User Service is UP"))
+	})
+
+	router.GET("/admin/health", func(c *gin.Context) {
+		adminServiceURL := os.Getenv("ADMIN_SERVICE_URL")
+		if adminServiceURL == "" {
+			adminServiceURL = "http://admin-service:8083" // Default in Docker
+		}
+
+		resp, err := http.Get(adminServiceURL + "/health")
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "DOWN",
+				"service": "admin-service",
+				"error":   err.Error(),
+			})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":  "DOWN",
+				"service": "admin-service",
+				"code":    resp.StatusCode,
+			})
+			return
+		}
+
+		c.Status(resp.StatusCode)
+		c.Writer.Write([]byte("Admin Service is UP"))
+	})
+
+	// Start server
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
 	}
 
-	// Load configuration
-	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		log.Fatal("CONFIG_PATH environment variable is required")
-	}
-
-	cfg, err := config.LoadConfig(configPath)
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
-
-	// Validate essential config
-	if cfg.Auth.JWTSecret == "" {
-		log.Fatal("JWT_SECRET environment variable is required")
-	}
-
-	// Initialize logger
-	isProd := os.Getenv("ENV") == "production"
-	logger, err := logging.Initialize(isProd)
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-	defer logger.Sync() // ensures that all pending log messages are flushed to the output destination
-
-	logger.Info("Starting API Gateway",
-		zap.String("port", cfg.Server.Port),
-		zap.String("env", os.Getenv("ENV")),
-	)
-
-	// Initialize and start the application
-	application := app.NewApp(cfg)      // creates a new application instance with the loaded configuration
-	server := application.SetupServer() // sets up the server with the application's configuration
-
-	// Start server in a goroutine
+	// Graceful shutdown
 	go func() {
-		log.Printf("Starting API Gateway on port %s", cfg.Server.Port)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
 	// Wait for interrupt signal
-	quit := make(chan os.Signal, 1) // creates a channel to receive OS signals
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-
-	// Graceful shutdown
 	log.Println("Shutting down server...")
+
+	// Give outstanding requests a timeout of 5 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
 	}
 
-	log.Println("Server exited properly")
+	log.Println("Server exiting")
 }
