@@ -3,13 +3,19 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"go.uber.org/zap"
 )
 
 // RegisterMiddlewares registers all middleware components with the router
-func RegisterMiddlewares(router *gin.Engine, logger *zap.Logger) {
+func RegisterMiddlewares(router *gin.Engine, cfg *config.Config, logger *zap.Logger) {
 	// Add recovery middleware first
 	router.Use(gin.Recovery())
+
+	// Add CORS middleware early in the chain
+	if cfg.CORS.Enabled {
+		router.Use(CORSMiddleware(cfg, logger))
+	}
 
 	// Add error handler middleware
 	router.Use(ErrorHandlerMiddleware(logger))

@@ -13,6 +13,7 @@ type Config struct {
 	Services ServicesConfig
 	Logging  LoggingConfig
 	JWT      JWTConfig
+	CORS     CORSConfig
 }
 
 // JWTConfig holds JWT-related configuration
@@ -23,6 +24,17 @@ type JWTConfig struct {
 	RefreshExpHours  int
 	SigningAlgorithm string
 	Issuer           string
+}
+
+// CORSConfig holds CORS-related configuration
+type CORSConfig struct {
+	Enabled          bool
+	AllowOrigins     []string
+	AllowMethods     []string
+	AllowHeaders     []string
+	ExposeHeaders    []string
+	AllowCredentials bool
+	MaxAge           time.Duration
 }
 
 // ServerConfig holds server-related configuration
@@ -72,6 +84,21 @@ func NewConfig() *Config {
 			SigningAlgorithm: getEnv("JWT_SIGNING_ALGORITHM", "HS256"),
 			Issuer:           getEnv("JWT_ISSUER", "qubool-kallyaanam-api"),
 		},
+		CORS: CORSConfig{
+			Enabled:      getBoolEnv("CORS_ENABLED", true),
+			AllowOrigins: getStringSliceEnv("CORS_ALLOW_ORIGINS", []string{"*"}),
+			AllowMethods: getStringSliceEnv("CORS_ALLOW_METHODS", []string{
+				"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
+			}),
+			AllowHeaders: getStringSliceEnv("CORS_ALLOW_HEADERS", []string{
+				"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID",
+			}),
+			ExposeHeaders: getStringSliceEnv("CORS_EXPOSE_HEADERS", []string{
+				"Content-Length", "X-Request-ID",
+			}),
+			AllowCredentials: getBoolEnv("CORS_ALLOW_CREDENTIALS", true),
+			MaxAge:           getDurationEnv("CORS_MAX_AGE", 12*time.Hour),
+		},
 	}
 }
 
@@ -82,6 +109,16 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// Add a helper function for string slice environment variables
+func getStringSliceEnv(key string, fallback []string) []string {
+	value := os.Getenv(key)
+	if len(strings.TrimSpace(value)) == 0 {
+		return fallback
+	}
+
+	return strings.Split(value, ",")
 }
 
 func getIntEnv(key string, fallback int) int {

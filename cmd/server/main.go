@@ -38,7 +38,7 @@ func main() {
 	router := gin.New()
 
 	// Register middlewares
-	middleware.RegisterMiddlewares(router, logger)
+	middleware.RegisterMiddlewares(router, cfg, logger)
 
 	// Register routes
 	routes.RegisterRoutes(router, cfg, logger)

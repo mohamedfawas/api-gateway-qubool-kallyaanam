@@ -23,6 +23,9 @@ const (
 
 // RegisterRoutes registers all API routes with the router
 func RegisterRoutes(router *gin.Engine, cfg *config.Config, logger *zap.Logger) {
+	// Register health check routes first
+	registerHealthRoutes(router, cfg, logger)
+
 	// API version group
 	apiV1 := router.Group("/api/v1")
 
