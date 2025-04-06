@@ -31,30 +31,6 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, logger *zap.Logger) 
 	registerAdminRoutes(apiV1, cfg, logger)
 }
 
-// registerAuthRoutes registers all routes for the auth service
-func registerAuthRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	auth := rg.Group("/auth")
-
-	// Health check passthrough
-	auth.GET("/health", func(c *gin.Context) {
-		forwardRequest(c, cfg.Services.AuthServiceURL+"/health", logger)
-	})
-
-	// Add more auth routes here
-}
-
-// registerUserRoutes registers all routes for the user service
-func registerUserRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	// Implementation needed
-	logger.Info("User routes registered")
-}
-
-// registerAdminRoutes registers all routes for the admin service
-func registerAdminRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	// Implementation needed
-	logger.Info("Admin routes registered")
-}
-
 // healthCheck provides a health check endpoint for the API Gateway
 func healthCheck() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -66,37 +42,13 @@ func healthCheck() gin.HandlerFunc {
 	}
 }
 
-// forwardRequest forwards requests to the appropriate service with proper error handling
+// Example of what the forwardRequest function might look like in your routes.go
 func forwardRequest(c *gin.Context, serviceURL string, logger *zap.Logger) {
-	// Create a client with timeout
 	client := &http.Client{
 		Timeout: defaultTimeout,
 	}
 
-	// Create a new request
-	req, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, serviceURL, c.Request.Body)
-	if err != nil {
-		logger.Error("Failed to create request",
-			zap.String("url", serviceURL),
-			zap.Error(err),
-		)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"status":  false,
-			"message": "Failed to create request",
-			"error":   err.Error(),
-		})
-		return
-	}
-
-	// Copy headers from original request
-	for k, v := range c.Request.Header {
-		for _, h := range v {
-			req.Header.Add(k, h)
-		}
-	}
-
-	// Send the request
-	resp, err := client.Do(req)
+	resp, err := client.Get(serviceURL)
 	if err != nil {
 		logger.Error("Service request failed",
 			zap.String("url", serviceURL),
@@ -112,7 +64,7 @@ func forwardRequest(c *gin.Context, serviceURL string, logger *zap.Logger) {
 	}
 	defer resp.Body.Close()
 
-	// Forward the status code
+	// Copy the status code
 	c.Status(resp.StatusCode)
 
 	// Copy headers
@@ -123,11 +75,5 @@ func forwardRequest(c *gin.Context, serviceURL string, logger *zap.Logger) {
 	}
 
 	// Copy the body
-	_, err = io.Copy(c.Writer, resp.Body)
-	if err != nil {
-		logger.Error("Failed to copy response body",
-			zap.String("url", serviceURL),
-			zap.Error(err),
-		)
-	}
+	io.Copy(c.Writer, resp.Body)
 }
