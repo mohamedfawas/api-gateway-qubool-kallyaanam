@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -9,12 +11,14 @@ import (
 
 // registerAdminRoutes registers all routes for the admin service
 func registerAdminRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	admin := rg.Group("/admin")
+	adminPath := rg.Group("/admin")
 
 	// Health check endpoint
-	admin.GET("/health", func(c *gin.Context) {
-		logger.Debug("Forwarding request to admin service health endpoint")
-		forwardRequest(c, cfg.Services.AdminServiceURL+"/health", logger)
+	adminPath.GET("/health", func(c *gin.Context) {
+		serviceURL := cfg.Services.AdminServiceURL + "/health"
+		logger.Debug("Forwarding request to admin service health endpoint",
+			zap.String("url", serviceURL))
+		forwardRequest(c, serviceURL, http.MethodGet, logger)
 	})
 
 	// Add more admin routes as needed

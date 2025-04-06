@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -9,12 +11,14 @@ import (
 
 // registerAuthRoutes registers all routes for the auth service
 func registerAuthRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	auth := rg.Group("/auth")
+	authPath := rg.Group("/auth")
 
 	// Health check endpoint
-	auth.GET("/health", func(c *gin.Context) {
-		logger.Debug("Forwarding request to auth service health endpoint")
-		forwardRequest(c, cfg.Services.AuthServiceURL+"/health", logger)
+	authPath.GET("/health", func(c *gin.Context) {
+		serviceURL := cfg.Services.AuthServiceURL + "/health"
+		logger.Debug("Forwarding request to auth service health endpoint",
+			zap.String("url", serviceURL))
+		forwardRequest(c, serviceURL, http.MethodGet, logger)
 	})
 
 	// Add more auth routes as needed

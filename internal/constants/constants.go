@@ -1,4 +1,3 @@
-// Package constants provides constant values used throughout the application
 package constants
 
 // HTTP Headers
@@ -6,6 +5,7 @@ const (
 	HeaderContentType     = "Content-Type"
 	HeaderApplicationJSON = "application/json"
 	HeaderRequestID       = "X-Request-ID"
+	HeaderAuthorization   = "Authorization"
 )
 
 // Response messages
@@ -23,4 +23,12 @@ const (
 	StatusNotFound            = "Not Found"
 	StatusInternalServerError = "Internal Server Error"
 	StatusServiceUnavailable  = "Service Unavailable"
+)
+
+// Error messages
+const (
+	ErrInvalidRequest     = "Invalid request"
+	ErrServiceUnavailable = "Service unavailable"
+	ErrInternalServer     = "Internal server error"
+	ErrResourceNotFound   = "Resource not found"
 )

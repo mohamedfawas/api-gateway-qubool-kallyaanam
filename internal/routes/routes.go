@@ -2,6 +2,8 @@
 package routes
 
 import (
+	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"time"
@@ -10,6 +12,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/constants"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/errors"
 )
 
 // Constants for configuration
@@ -42,24 +46,68 @@ func healthCheck() gin.HandlerFunc {
 	}
 }
 
-// Example of what the forwardRequest function might look like in your routes.go
-func forwardRequest(c *gin.Context, serviceURL string, logger *zap.Logger) {
-	client := &http.Client{
-		Timeout: defaultTimeout,
+// forwardRequest forwards a request to a service and returns the response
+func forwardRequest(c *gin.Context, serviceURL string, method string, logger *zap.Logger) {
+	// Create timeout context
+	ctx, cancel := context.WithTimeout(c.Request.Context(), defaultTimeout)
+	defer cancel()
+
+	// Create the request to the service
+	var req *http.Request
+	var err error
+
+	// Handle request based on HTTP method
+	switch method {
+	case http.MethodGet, http.MethodDelete:
+		req, err = http.NewRequestWithContext(ctx, method, serviceURL, nil)
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
+		// Read the request body
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			logger.Error("Failed to read request body", zap.Error(err))
+			c.Error(errors.BadRequestError("Invalid request body", err))
+			return
+		}
+		// Create new request with the body
+		req, err = http.NewRequestWithContext(ctx, method, serviceURL, bytes.NewBuffer(bodyBytes))
+	default:
+		logger.Error("Unsupported HTTP method", zap.String("method", method))
+		c.Error(errors.BadRequestError("Unsupported HTTP method", nil))
+		return
 	}
 
-	resp, err := client.Get(serviceURL)
+	if err != nil {
+		logger.Error("Failed to create request", zap.Error(err))
+		c.Error(errors.InternalError("Failed to create request", err))
+		return
+	}
+
+	// Copy headers from original request
+	for key, values := range c.Request.Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+
+	// Set content type if it's not set
+	if req.Header.Get(constants.HeaderContentType) == "" {
+		req.Header.Set(constants.HeaderContentType, constants.HeaderApplicationJSON)
+	}
+
+	// Forward the request ID if available
+	if requestID := c.GetHeader(constants.HeaderRequestID); requestID != "" {
+		req.Header.Set(constants.HeaderRequestID, requestID)
+	}
+
+	// Send request to service
+	client := &http.Client{Timeout: defaultTimeout}
+	resp, err := client.Do(req)
 	if err != nil {
 		logger.Error("Service request failed",
 			zap.String("url", serviceURL),
 			zap.Error(err),
 		)
-
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status":  false,
-			"message": "Service unavailable",
-			"error":   err.Error(),
-		})
+		c.Error(errors.ServiceUnavailableError("Service unavailable", err))
 		return
 	}
 	defer resp.Body.Close()
@@ -67,13 +115,18 @@ func forwardRequest(c *gin.Context, serviceURL string, logger *zap.Logger) {
 	// Copy the status code
 	c.Status(resp.StatusCode)
 
-	// Copy headers
-	for k, v := range resp.Header {
-		for _, h := range v {
-			c.Writer.Header().Add(k, h)
+	// Copy headers from service response
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Writer.Header().Add(key, value)
 		}
 	}
 
-	// Copy the body
-	io.Copy(c.Writer, resp.Body)
+	// Copy the response body
+	_, err = io.Copy(c.Writer, resp.Body)
+	if err != nil {
+		logger.Error("Failed to copy response body", zap.Error(err))
+		c.Error(errors.InternalError("Failed to process service response", err))
+		return
+	}
 }
