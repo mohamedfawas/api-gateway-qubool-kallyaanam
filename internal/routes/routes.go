@@ -29,10 +29,21 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, logger *zap.Logger) 
 	// Health check endpoint
 	router.GET("/health", healthCheck())
 
-	// Register service routes
-	registerAuthRoutes(apiV1, cfg, logger)
-	registerUserRoutes(apiV1, cfg, logger)
-	registerAdminRoutes(apiV1, cfg, logger)
+	// Create public groups for each service
+	authPublic := NewPublicRouteGroup(apiV1.Group("/auth"), cfg, logger)
+	usersPublic := NewPublicRouteGroup(apiV1.Group("/users"), cfg, logger)
+	adminPublic := NewPublicRouteGroup(apiV1.Group("/admin"), cfg, logger)
+
+	// Create protected groups for each service
+	usersProtected := NewProtectedRouteGroup(apiV1.Group("/users"), cfg, logger, []string{constants.RoleUser})
+	adminProtected := NewProtectedRouteGroup(apiV1.Group("/admin"), cfg, logger, []string{constants.RoleAdmin})
+
+	// Register routes
+	registerAuthRoutes(authPublic, cfg, logger)
+	registerUserPublicRoutes(usersPublic, cfg, logger)
+	registerUserProtectedRoutes(usersProtected, cfg, logger)
+	registerAdminPublicRoutes(adminPublic, cfg, logger)
+	registerAdminProtectedRoutes(adminProtected, cfg, logger)
 }
 
 // healthCheck provides a health check endpoint for the API Gateway

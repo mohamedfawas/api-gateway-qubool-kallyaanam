@@ -32,3 +32,13 @@ const (
 	ErrInternalServer     = "Internal server error"
 	ErrResourceNotFound   = "Resource not found"
 )
+
+// Authentication constants
+const (
+	// Roles
+	RoleAdmin = "admin"
+	RoleUser  = "user"
+
+	// Context keys
+	ContextKeyUser = "user"
+)

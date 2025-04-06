@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -11,6 +12,17 @@ type Config struct {
 	Server   ServerConfig
 	Services ServicesConfig
 	Logging  LoggingConfig
+	JWT      JWTConfig
+}
+
+// JWTConfig holds JWT-related configuration
+type JWTConfig struct {
+	Secret           string
+	ExpirationHours  int
+	RefreshSecret    string
+	RefreshExpHours  int
+	SigningAlgorithm string
+	Issuer           string
 }
 
 // ServerConfig holds server-related configuration
@@ -52,6 +64,14 @@ func NewConfig() *Config {
 			Level:       getEnv("LOG_LEVEL", "info"),
 			Development: getBoolEnv("DEVELOPMENT", true),
 		},
+		JWT: JWTConfig{
+			Secret:           getEnv("JWT_SECRET", "your-secret-key"),
+			ExpirationHours:  getIntEnv("JWT_EXPIRATION_HOURS", 24),
+			RefreshSecret:    getEnv("JWT_REFRESH_SECRET", "your-refresh-secret-key"),
+			RefreshExpHours:  getIntEnv("JWT_REFRESH_EXPIRATION_HOURS", 168), // 7 days
+			SigningAlgorithm: getEnv("JWT_SIGNING_ALGORITHM", "HS256"),
+			Issuer:           getEnv("JWT_ISSUER", "qubool-kallyaanam-api"),
+		},
 	}
 }
 
@@ -62,6 +82,19 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getIntEnv(key string, fallback int) int {
+	value := os.Getenv(key)
+	if len(strings.TrimSpace(value)) == 0 {
+		return fallback
+	}
+
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return intValue
 }
 
 // Helper function to get a duration environment variable with a fallback value

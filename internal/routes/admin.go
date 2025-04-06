@@ -9,21 +9,21 @@ import (
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 )
 
-// registerAdminRoutes registers all routes for the admin service
-func registerAdminRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	adminPath := rg.Group("/admin")
-
+// registerAdminPublicRoutes registers public routes for the admin service
+func registerAdminPublicRoutes(rg *RouteGroup, cfg *config.Config, logger *zap.Logger) {
 	// Health check endpoint
-	adminPath.GET("/health", func(c *gin.Context) {
+	rg.Router.GET("/health", func(c *gin.Context) {
 		serviceURL := cfg.Services.AdminServiceURL + "/health"
 		logger.Debug("Forwarding request to admin service health endpoint",
 			zap.String("url", serviceURL))
 		forwardRequest(c, serviceURL, http.MethodGet, logger)
 	})
 
-	// Add more admin routes as needed
-	// Examples:
-	// admin.GET("/users", handleListUsers(cfg, logger))
-	// admin.POST("/users/block", handleBlockUser(cfg, logger))
-	// admin.GET("/dashboard", handleDashboard(cfg, logger))
+	// Other public endpoints...
+}
+
+// registerAdminProtectedRoutes registers protected routes for the admin service
+func registerAdminProtectedRoutes(rg *RouteGroup, cfg *config.Config, logger *zap.Logger) {
+	// Protected endpoints...
+	// For now, we won't add any since we're focusing on health checks
 }

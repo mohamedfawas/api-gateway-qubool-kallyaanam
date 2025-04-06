@@ -10,11 +10,9 @@ import (
 )
 
 // registerAuthRoutes registers all routes for the auth service
-func registerAuthRoutes(rg *gin.RouterGroup, cfg *config.Config, logger *zap.Logger) {
-	authPath := rg.Group("/auth")
-
+func registerAuthRoutes(rg *RouteGroup, cfg *config.Config, logger *zap.Logger) {
 	// Health check endpoint
-	authPath.GET("/health", func(c *gin.Context) {
+	rg.Router.GET("/health", func(c *gin.Context) {
 		serviceURL := cfg.Services.AuthServiceURL + "/health"
 		logger.Debug("Forwarding request to auth service health endpoint",
 			zap.String("url", serviceURL))
