@@ -17,6 +17,11 @@ func RegisterMiddlewares(router *gin.Engine, cfg *config.Config, logger *zap.Log
 		router.Use(CORSMiddleware(cfg, logger))
 	}
 
+	// Add rate limiter middleware
+	if cfg.RateLimiting.Enabled {
+		router.Use(RateLimiterMiddleware(cfg, logger))
+	}
+
 	// Add error handler middleware
 	router.Use(ErrorHandlerMiddleware(logger))
 
