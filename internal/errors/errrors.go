@@ -18,6 +18,7 @@ const (
 	ErrorTypeNotFound           ErrorType = "NOT_FOUND"
 	ErrorTypeInternal           ErrorType = "INTERNAL_ERROR"
 	ErrorTypeServiceUnavailable ErrorType = "SERVICE_UNAVAILABLE"
+	ErrorTypeRateLimited        ErrorType = "RATE_LIMITED"
 )
 
 // APIError represents a standard API error
@@ -49,6 +50,8 @@ func (e *APIError) StatusCode() int {
 		return http.StatusNotFound
 	case ErrorTypeServiceUnavailable:
 		return http.StatusServiceUnavailable
+	case ErrorTypeRateLimited:
+		return http.StatusTooManyRequests
 	default:
 		return http.StatusInternalServerError
 	}
@@ -96,4 +99,9 @@ func ServiceUnavailableError(message string, err error) *APIError {
 // InternalError creates a new internal server error
 func InternalError(message string, err error) *APIError {
 	return New(ErrorTypeInternal, message, err)
+}
+
+// Add a convenience function for rate limited errors
+func RateLimitedError(message string) *APIError {
+	return New(ErrorTypeRateLimited, message, nil)
 }

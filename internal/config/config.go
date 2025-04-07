@@ -9,11 +9,33 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Server   ServerConfig
-	Services ServicesConfig
-	Logging  LoggingConfig
-	JWT      JWTConfig
-	CORS     CORSConfig
+	Server         ServerConfig
+	Services       ServicesConfig
+	Logging        LoggingConfig
+	JWT            JWTConfig
+	CORS           CORSConfig
+	RateLimiting   RateLimitingConfig
+	CircuitBreaker CircuitBreakerConfig
+}
+
+// RateLimitingConfig holds rate limiting configuration
+type RateLimitingConfig struct {
+	Enabled      bool
+	Limit        int           // Requests per time window
+	Burst        int           // Maximum burst size
+	Window       time.Duration // Time window for rate limiting
+	StoreType    string        // "memory" or "redis"
+	RedisAddress string        // Redis address if using Redis
+}
+
+// CircuitBreakerConfig holds circuit breaker configuration
+type CircuitBreakerConfig struct {
+	Enabled                  bool
+	Timeout                  time.Duration // How long to wait before trying again
+	MaxRequests              uint32        // Max number of requests allowed to half-open state
+	RequestVolumeThreshold   uint32        // Minimum requests needed before tripping
+	ErrorThresholdPercentage int           // Error percentage to trip circuit
+	SleepWindow              time.Duration // How long to wait before testing the service again
 }
 
 // JWTConfig holds JWT-related configuration
@@ -98,6 +120,23 @@ func NewConfig() *Config {
 			}),
 			AllowCredentials: getBoolEnv("CORS_ALLOW_CREDENTIALS", true),
 			MaxAge:           getDurationEnv("CORS_MAX_AGE", 12*time.Hour),
+		},
+		RateLimiting: RateLimitingConfig{
+			Enabled:      getBoolEnv("RATE_LIMIT_ENABLED", true),
+			Limit:        getIntEnv("RATE_LIMIT", 100),
+			Burst:        getIntEnv("RATE_LIMIT_BURST", 150),
+			Window:       getDurationEnv("RATE_LIMIT_WINDOW", time.Minute),
+			StoreType:    getEnv("RATE_LIMIT_STORE", "memory"),
+			RedisAddress: getEnv("REDIS_ADDRESS", "redis:6379"),
+		},
+
+		CircuitBreaker: CircuitBreakerConfig{
+			Enabled:                  getBoolEnv("CIRCUIT_BREAKER_ENABLED", true),
+			Timeout:                  getDurationEnv("CIRCUIT_BREAKER_TIMEOUT", 30*time.Second),
+			MaxRequests:              uint32(getIntEnv("CIRCUIT_BREAKER_MAX_REQUESTS", 5)),
+			RequestVolumeThreshold:   uint32(getIntEnv("CIRCUIT_BREAKER_REQUEST_VOLUME", 10)),
+			ErrorThresholdPercentage: getIntEnv("CIRCUIT_BREAKER_ERROR_THRESHOLD", 50),
+			SleepWindow:              getDurationEnv("CIRCUIT_BREAKER_SLEEP_WINDOW", 10*time.Second),
 		},
 	}
 }
