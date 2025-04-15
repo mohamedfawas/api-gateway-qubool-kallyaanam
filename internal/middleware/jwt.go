@@ -62,8 +62,6 @@ func JWTAuthMiddleware(cfg *config.Config, logger *zap.Logger) gin.HandlerFunc {
 			return
 		}
 
-		// Validate the token
-		// Validate the token
 		if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
 			// Check if the token is expired - using the new JWT v5 approach
 			expirationTime, err := claims.GetExpirationTime()
@@ -78,7 +76,8 @@ func JWTAuthMiddleware(cfg *config.Config, logger *zap.Logger) gin.HandlerFunc {
 			c.Set("user", claims)
 			logger.Debug("Authenticated user",
 				zap.String("user_id", claims.UserID),
-				zap.String("email", claims.Email))
+				zap.String("email", claims.Email),
+				zap.Strings("roles", claims.Roles))
 		} else {
 			logger.Debug("Invalid token claims")
 			c.Error(apiErrors.New(apiErrors.ErrorTypeUnauthorized, "Invalid token claims", nil))

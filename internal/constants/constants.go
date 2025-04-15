@@ -41,4 +41,9 @@ const (
 
 	// Context keys
 	ContextKeyUser = "user"
+
+	// Headers for propagating user identity
+	HeaderUserID   = "X-User-ID"
+	HeaderUserRole = "X-User-Role"
+	HeaderUsername = "X-Username"
 )

@@ -12,6 +12,9 @@ func RegisterMiddlewares(router *gin.Engine, cfg *config.Config, logger *zap.Log
 	// Add recovery middleware first
 	router.Use(gin.Recovery())
 
+	// Add logger middleware
+	router.Use(LoggerMiddleware(logger))
+
 	// Add CORS middleware early in the chain
 	if cfg.CORS.Enabled {
 		router.Use(CORSMiddleware(cfg, logger))
@@ -25,9 +28,6 @@ func RegisterMiddlewares(router *gin.Engine, cfg *config.Config, logger *zap.Log
 	// Add error handler middleware
 	router.Use(ErrorHandlerMiddleware(logger))
 
-	// Add logger middleware
-	router.Use(LoggerMiddleware(logger))
-
 	// Add standard response formatter middleware
-	router.Use(StandardResponseMiddleware())
+	router.Use(ResponseWrapper())
 }

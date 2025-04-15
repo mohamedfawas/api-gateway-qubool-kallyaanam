@@ -17,48 +17,37 @@ type ErrorResponse struct {
 	Error   interface{} `json:"error,omitempty"`
 }
 
-// ErrorHandlerMiddleware handles and formats errors consistently
 func ErrorHandlerMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Process request
 		c.Next()
 
-		// If there are no errors, just continue
 		if len(c.Errors) == 0 {
 			return
 		}
 
-		// Get the last error
 		err := c.Errors.Last()
 		logger.Error("Request error", zap.Error(err.Err))
 
-		// Check if it's our custom API error
 		var statusCode int
-		var errorResponse interface{}
+		var errDetails interface{}
 
 		if apiErr, ok := err.Err.(*errors.APIError); ok {
 			statusCode = apiErr.StatusCode()
-			errorResponse = apiErr
+			errDetails = apiErr
 		} else {
-			// For generic errors, use internal server error
 			statusCode = http.StatusInternalServerError
-			errorResponse = map[string]string{
+			errDetails = map[string]string{
 				"type":    string(errors.ErrorTypeInternal),
 				"message": err.Error(),
 			}
 		}
 
-		// Get appropriate message based on status code
-		message := getMessageForStatusCode(statusCode)
-
-		// Return error response
 		c.JSON(statusCode, ErrorResponse{
 			Status:  false,
-			Message: message,
-			Error:   errorResponse,
+			Message: getMessageForStatusCode(statusCode),
+			Error:   errDetails,
 		})
 
-		// Abort the request chain
 		c.Abort()
 	}
 }

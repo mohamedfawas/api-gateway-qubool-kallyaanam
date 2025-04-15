@@ -14,6 +14,7 @@ import (
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/constants"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/errors"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/middleware"
 )
 
 // Constants for configuration
@@ -28,9 +29,6 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, logger *zap.Logger) 
 
 	// API version group
 	apiV1 := router.Group("/api/v1")
-
-	// Health check endpoint
-	router.GET("/health", healthCheck())
 
 	// Create public groups for each service
 	authPublic := NewPublicRouteGroup(apiV1.Group("/auth"), cfg, logger)
@@ -47,17 +45,6 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, logger *zap.Logger) 
 	registerUserProtectedRoutes(usersProtected, cfg, logger)
 	registerAdminPublicRoutes(adminPublic, cfg, logger)
 	registerAdminProtectedRoutes(adminProtected, cfg, logger)
-}
-
-// healthCheck provides a health check endpoint for the API Gateway
-func healthCheck() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"service": "api-gateway",
-			"status":  "UP",
-			"version": "0.1.0",
-		})
-	}
 }
 
 // forwardRequest forwards a request to a service and returns the response
@@ -111,6 +98,30 @@ func forwardRequest(c *gin.Context, serviceURL string, method string, logger *za
 	// Forward the request ID if available
 	if requestID := c.GetHeader(constants.HeaderRequestID); requestID != "" {
 		req.Header.Set(constants.HeaderRequestID, requestID)
+	}
+
+	// Propagate user information if available
+	if user, exists := c.Get("user"); exists {
+		if userClaims, ok := user.(*middleware.UserClaims); ok {
+			// Add user ID header
+			req.Header.Set(constants.HeaderUserID, userClaims.UserID)
+
+			// Add email/username if available
+			if userClaims.Email != "" {
+				req.Header.Set(constants.HeaderUsername, userClaims.Email)
+			}
+
+			// Add role header - use first role or empty string if none
+			userRole := ""
+			if len(userClaims.Roles) > 0 {
+				userRole = userClaims.Roles[0]
+			}
+			req.Header.Set(constants.HeaderUserRole, userRole)
+
+			logger.Debug("Propagating user information to downstream service",
+				zap.String("user_id", userClaims.UserID),
+				zap.String("role", userRole))
+		}
 	}
 
 	// Send request to service
