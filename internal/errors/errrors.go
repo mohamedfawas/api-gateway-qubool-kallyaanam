@@ -57,6 +57,18 @@ func (e *APIError) StatusCode() int {
 	}
 }
 
+// ToResponse formats the error for API response
+func (e *APIError) ToResponse() map[string]interface{} {
+	response := map[string]interface{}{
+		"type":    string(e.Type),
+		"message": e.Message,
+	}
+	if e.Details != nil {
+		response["details"] = e.Details
+	}
+	return response
+}
+
 // New creates a new APIError
 func New(errorType ErrorType, message string, err error) *APIError {
 	return &APIError{
@@ -101,7 +113,7 @@ func InternalError(message string, err error) *APIError {
 	return New(ErrorTypeInternal, message, err)
 }
 
-// Add a convenience function for rate limited errors
+// RateLimitedError creates a new rate limited error
 func RateLimitedError(message string) *APIError {
 	return New(ErrorTypeRateLimited, message, nil)
 }

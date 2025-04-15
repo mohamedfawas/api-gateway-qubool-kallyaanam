@@ -7,16 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/constants"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/errors"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/utils"
 	"go.uber.org/zap"
 )
 
-// ErrorResponse is the standard error response format
-type ErrorResponse struct {
-	Status  bool        `json:"status"`
-	Message string      `json:"message"`
-	Error   interface{} `json:"error,omitempty"`
-}
-
+// ErrorHandlerMiddleware handles all errors in a standardized way
 func ErrorHandlerMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
@@ -28,27 +23,18 @@ func ErrorHandlerMiddleware(logger *zap.Logger) gin.HandlerFunc {
 		err := c.Errors.Last()
 		logger.Error("Request error", zap.Error(err.Err))
 
-		var statusCode int
-		var errDetails interface{}
-
+		// Handle custom API errors
 		if apiErr, ok := err.Err.(*errors.APIError); ok {
-			statusCode = apiErr.StatusCode()
-			errDetails = apiErr
-		} else {
-			statusCode = http.StatusInternalServerError
-			errDetails = map[string]string{
-				"type":    string(errors.ErrorTypeInternal),
-				"message": err.Error(),
-			}
+			statusCode := apiErr.StatusCode()
+			utils.RespondWithError(c, statusCode, getMessageForStatusCode(statusCode), apiErr.ToResponse())
+			return
 		}
 
-		c.JSON(statusCode, ErrorResponse{
-			Status:  false,
-			Message: getMessageForStatusCode(statusCode),
-			Error:   errDetails,
+		// Handle generic errors
+		utils.RespondWithInternalError(c, constants.StatusInternalServerError, map[string]string{
+			"type":    string(errors.ErrorTypeInternal),
+			"message": err.Error(),
 		})
-
-		c.Abort()
 	}
 }
 
@@ -65,6 +51,8 @@ func getMessageForStatusCode(statusCode int) string {
 		return constants.StatusNotFound
 	case http.StatusServiceUnavailable:
 		return constants.StatusServiceUnavailable
+	case http.StatusTooManyRequests:
+		return constants.StatusTooManyRequests
 	default:
 		return constants.StatusInternalServerError
 	}

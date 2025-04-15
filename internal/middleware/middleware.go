@@ -9,7 +9,7 @@ import (
 
 // RegisterMiddlewares registers all middleware components with the router
 func RegisterMiddlewares(router *gin.Engine, cfg *config.Config, logger *zap.Logger) {
-	// Add recovery middleware first
+	// Add recovery middleware first to handle panics
 	router.Use(gin.Recovery())
 
 	// Add logger middleware
@@ -25,9 +25,7 @@ func RegisterMiddlewares(router *gin.Engine, cfg *config.Config, logger *zap.Log
 		router.Use(RateLimiterMiddleware(cfg, logger))
 	}
 
-	// Add error handler middleware
+	// Add error handler middleware as the last middleware
+	// This ensures all errors from previous middlewares and handlers are caught
 	router.Use(ErrorHandlerMiddleware(logger))
-
-	// Add standard response formatter middleware
-	router.Use(ResponseWrapper())
 }

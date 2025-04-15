@@ -23,6 +23,7 @@ const (
 	StatusNotFound            = "Not Found"
 	StatusInternalServerError = "Internal Server Error"
 	StatusServiceUnavailable  = "Service Unavailable"
+	StatusTooManyRequests     = "Too Many Requests"
 )
 
 // Error messages

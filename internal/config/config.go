@@ -8,13 +8,12 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Server         ServerConfig
-	Services       ServicesConfig
-	Logging        LoggingConfig
-	JWT            JWTConfig
-	CORS           CORSConfig
-	RateLimiting   RateLimitingConfig
-	CircuitBreaker CircuitBreakerConfig
+	Server       ServerConfig
+	Services     ServicesConfig
+	Logging      LoggingConfig
+	JWT          JWTConfig
+	CORS         CORSConfig
+	RateLimiting RateLimitingConfig
 }
 
 // RateLimitingConfig holds rate limiting configuration
@@ -23,18 +22,7 @@ type RateLimitingConfig struct {
 	Limit        int           // Requests per time window
 	Burst        int           // Maximum burst size
 	Window       time.Duration // Time window for rate limiting
-	StoreType    string        // "memory" or "redis"
-	RedisAddress string        // Redis address if using Redis
-}
-
-// CircuitBreakerConfig holds circuit breaker configuration
-type CircuitBreakerConfig struct {
-	Enabled                  bool
-	Timeout                  time.Duration // How long to wait before trying again
-	MaxRequests              uint32        // Max number of requests allowed to half-open state
-	RequestVolumeThreshold   uint32        // Minimum requests needed before tripping
-	ErrorThresholdPercentage int           // Error percentage to trip circuit
-	SleepWindow              time.Duration // How long to wait before testing the service again
+	RedisAddress string        // Redis address for rate limiting
 }
 
 // JWTConfig holds JWT-related configuration
@@ -124,16 +112,7 @@ func NewConfig() *Config {
 			Limit:        viper.GetInt("RATE_LIMIT"),
 			Burst:        viper.GetInt("RATE_LIMIT_BURST"),
 			Window:       viper.GetDuration("RATE_LIMIT_WINDOW"),
-			StoreType:    viper.GetString("RATE_LIMIT_STORE"),
 			RedisAddress: viper.GetString("REDIS_ADDRESS"),
-		},
-		CircuitBreaker: CircuitBreakerConfig{
-			Enabled:                  viper.GetBool("CIRCUIT_BREAKER_ENABLED"),
-			Timeout:                  viper.GetDuration("CIRCUIT_BREAKER_TIMEOUT"),
-			MaxRequests:              uint32(viper.GetInt("CIRCUIT_BREAKER_MAX_REQUESTS")),
-			RequestVolumeThreshold:   uint32(viper.GetInt("CIRCUIT_BREAKER_REQUEST_VOLUME")),
-			ErrorThresholdPercentage: viper.GetInt("CIRCUIT_BREAKER_ERROR_THRESHOLD"),
-			SleepWindow:              viper.GetDuration("CIRCUIT_BREAKER_SLEEP_WINDOW"),
 		},
 	}
 }
@@ -179,19 +158,10 @@ func setDefaults() {
 	viper.SetDefault("CORS_ALLOW_CREDENTIALS", true)
 	viper.SetDefault("CORS_MAX_AGE", 12*time.Hour)
 
-	// Rate limiting defaults
+	// Rate limiting defaults - simplified to only use Redis
 	viper.SetDefault("RATE_LIMIT_ENABLED", true)
 	viper.SetDefault("RATE_LIMIT", 100)
 	viper.SetDefault("RATE_LIMIT_BURST", 150)
 	viper.SetDefault("RATE_LIMIT_WINDOW", time.Minute)
-	viper.SetDefault("RATE_LIMIT_STORE", "memory")
 	viper.SetDefault("REDIS_ADDRESS", "redis:6379")
-
-	// Circuit breaker defaults
-	viper.SetDefault("CIRCUIT_BREAKER_ENABLED", true)
-	viper.SetDefault("CIRCUIT_BREAKER_TIMEOUT", 30*time.Second)
-	viper.SetDefault("CIRCUIT_BREAKER_MAX_REQUESTS", 5)
-	viper.SetDefault("CIRCUIT_BREAKER_REQUEST_VOLUME", 10)
-	viper.SetDefault("CIRCUIT_BREAKER_ERROR_THRESHOLD", 50)
-	viper.SetDefault("CIRCUIT_BREAKER_SLEEP_WINDOW", 10*time.Second)
 }

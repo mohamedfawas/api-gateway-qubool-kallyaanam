@@ -1,4 +1,3 @@
-// Package middleware provides HTTP middleware components for the API Gateway
 package middleware
 
 import (
@@ -12,15 +11,32 @@ import (
 // CORSMiddleware creates a middleware for handling CORS
 func CORSMiddleware(cfg *config.Config, logger *zap.Logger) gin.HandlerFunc {
 	corsConfig := cors.Config{
-		AllowOrigins:     cfg.CORS.AllowOrigins,
-		AllowMethods:     cfg.CORS.AllowMethods,
-		AllowHeaders:     cfg.CORS.AllowHeaders,
-		ExposeHeaders:    cfg.CORS.ExposeHeaders,
+		// List of allowed origins (domains) that can make requests to this API.
+		// For example: http://localhost:3000 or https://your-frontend.com
+		AllowOrigins: cfg.CORS.AllowOrigins,
+
+		// List of HTTP methods that are allowed for cross-origin requests.
+		// For example: GET, POST, PUT, DELETE
+		AllowMethods: cfg.CORS.AllowMethods,
+
+		// List of headers that the client can use when making a request.
+		// For example: Content-Type, Authorization
+		AllowHeaders: cfg.CORS.AllowHeaders,
+
+		// List of headers that the browser is allowed to access in the response.
+		// For example: Content-Length
+		ExposeHeaders: cfg.CORS.ExposeHeaders,
+
+		// If true, the server allows credentials like cookies or authorization headers in cross-origin requests.
 		AllowCredentials: cfg.CORS.AllowCredentials,
-		MaxAge:           cfg.CORS.MaxAge,
+
+		// How long (in seconds) the results of a preflight request can be cached by the browser.
+		// A preflight request is a CORS mechanism to check if the real request is safe to send.
+		MaxAge: cfg.CORS.MaxAge,
 	}
 
-	// Log CORS configuration
+	// Use the logger to print the current CORS configuration.
+	// This is helpful for debugging and verifying the settings.
 	logger.Info("Configured CORS middleware",
 		zap.Strings("allowOrigins", cfg.CORS.AllowOrigins),
 		zap.Strings("allowMethods", cfg.CORS.AllowMethods),
@@ -30,5 +46,6 @@ func CORSMiddleware(cfg *config.Config, logger *zap.Logger) gin.HandlerFunc {
 		zap.Duration("maxAge", cfg.CORS.MaxAge),
 	)
 
+	// Return the actual middleware function
 	return cors.New(corsConfig)
 }

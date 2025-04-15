@@ -14,6 +14,7 @@ import (
 
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/config"
 	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/models"
+	"github.com/mohamedfawas/api-gateway-qubool-kallyaanam/internal/utils"
 )
 
 // Constants for health status
@@ -155,7 +156,6 @@ func aggregatedHealthCheck(cfg *config.Config, logger *zap.Logger) gin.HandlerFu
 			}
 		}
 
-		statusCode := http.StatusOK
 		if !allServicesUp {
 			// If any service is down, the gateway is still up but with degraded functionality
 			health.Gateway.Details = map[string]string{
@@ -163,11 +163,8 @@ func aggregatedHealthCheck(cfg *config.Config, logger *zap.Logger) gin.HandlerFu
 			}
 		}
 
-		c.JSON(statusCode, gin.H{
-			"status":  true,
-			"message": "Health check successful",
-			"data":    health,
-		})
+		// Use the new response utility instead of direct JSON formatting
+		utils.RespondWithSuccess(c, "Health check successful", health)
 	}
 }
 
