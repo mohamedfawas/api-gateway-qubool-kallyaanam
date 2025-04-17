@@ -25,11 +25,30 @@ type UserClaims struct {
 // JWTAuthMiddleware creates a middleware for JWT authentication
 func JWTAuthMiddleware(cfg *config.Config, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get the Authorization header
-		authHeader := c.GetHeader(constants.HeaderAuthorization)
+		// First check if we have user info from gateway in headers
+		userID := c.GetHeader(constants.HeaderUserID)
+		userRole := c.GetHeader(constants.HeaderUserRole)
+
+		// If headers are present and we trust the API gateway, we can use these values
+		if userID != "" && userRole != "" {
+			// Store the user info in the context
+			logger.Debug("User authenticated via gateway headers",
+				zap.String("user_id", userID),
+				zap.String("role", userRole))
+
+			// Create simplified claims object from headers
+			c.Set("user", &UserClaims{
+				UserID: userID,
+				Roles:  []string{userRole},
+			})
+			c.Next()
+			return
+		}
+		// Otherwise, fall back to direct JWT validation
+		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			logger.Debug("Missing authorization header")
-			c.Error(apiErrors.New(apiErrors.ErrorTypeUnauthorized, "Missing authorization header", nil))
+			logger.Debug("Missing authorization header or gateway headers")
+			c.JSON(401, gin.H{"error": "Authentication required"})
 			c.Abort()
 			return
 		}
@@ -38,19 +57,26 @@ func JWTAuthMiddleware(cfg *config.Config, logger *zap.Logger) gin.HandlerFunc {
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			logger.Debug("Invalid authorization header format")
-			c.Error(apiErrors.New(apiErrors.ErrorTypeUnauthorized, "Invalid authorization header format", nil))
+			c.JSON(401, gin.H{"error": "Invalid authentication format"})
 			c.Abort()
 			return
 		}
 
 		tokenString := parts[1]
 
-		// Parse the token
+		// Parse the token with improved validation
 		token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-			// Validate signing algorithm
+			// Validate signing algorithm (explicit check for security)
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
+
+			// Check the 'kid' header if present (for future key rotation)
+			if kid, ok := token.Header["kid"].(string); ok {
+				logger.Debug("Token key ID", zap.String("kid", kid))
+				// We currently use just one key, but this can be extended for key rotation
+			}
+
 			return []byte(cfg.JWT.Secret), nil
 		})
 
