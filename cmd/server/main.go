@@ -19,7 +19,10 @@ import (
 
 func main() {
 	// Load configuration
-	cfg := config.NewConfig()
+	cfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	// Initialize logger
 	logger, err := utils.NewLogger(cfg)

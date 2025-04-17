@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/viper"
@@ -67,14 +68,35 @@ type LoggingConfig struct {
 	Development bool
 }
 
+// Add this function
+func validateConfig(cfg *Config) error {
+	// Validate JWT configuration
+	if cfg.JWT.Secret == "" {
+		return fmt.Errorf("JWT_SECRET environment variable is required")
+	}
+
+	// Validate service URLs
+	if cfg.Services.AuthServiceURL == "" {
+		return fmt.Errorf("AUTH_SERVICE_URL environment variable is required")
+	}
+	if cfg.Services.UserServiceURL == "" {
+		return fmt.Errorf("USER_SERVICE_URL environment variable is required")
+	}
+	if cfg.Services.AdminServiceURL == "" {
+		return fmt.Errorf("ADMIN_SERVICE_URL environment variable is required")
+	}
+
+	return nil
+}
+
 // NewConfig creates and initializes a new Config instance
-func NewConfig() *Config {
+func NewConfig() (*Config, error) {
 	setDefaults()
 
 	// Auto-read from environment variables
 	viper.AutomaticEnv()
 
-	return &Config{
+	config := &Config{
 		Server: ServerConfig{
 			Port:         viper.GetString("PORT"),
 			ReadTimeout:  viper.GetDuration("READ_TIMEOUT"),
@@ -115,6 +137,13 @@ func NewConfig() *Config {
 			RedisAddress: viper.GetString("REDIS_ADDRESS"),
 		},
 	}
+
+	// Add this before returning:
+	if err := validateConfig(config); err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }
 
 // setDefaults configures all the default values
@@ -135,9 +164,7 @@ func setDefaults() {
 	viper.SetDefault("DEVELOPMENT", true)
 
 	// JWT defaults - using the same secret across all services for consistent authentication
-	viper.SetDefault("JWT_SECRET", "your-strong-secret-key-change-in-production")
 	viper.SetDefault("JWT_EXPIRATION_HOURS", 24)
-	viper.SetDefault("JWT_REFRESH_SECRET", "your-refresh-secret-key-change-in-production")
 	viper.SetDefault("JWT_REFRESH_EXPIRATION_HOURS", 168) // 7 days
 	viper.SetDefault("JWT_SIGNING_ALGORITHM", "HS256")
 	viper.SetDefault("JWT_ISSUER", "qubool-kallyaanam-api")
