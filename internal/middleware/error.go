@@ -1,4 +1,3 @@
-// Package middleware provides HTTP middleware components for the API Gateway
 package middleware
 
 import (
@@ -11,30 +10,44 @@ import (
 	"go.uber.org/zap"
 )
 
-// ErrorHandlerMiddleware handles all errors in a standardized way
+// ErrorHandlerMiddleware is a function that returns a Gin middleware.
+// This middleware catches and handles all errors in one place.
 func ErrorHandlerMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Call the next handler in the chain. This could be another middleware or the actual endpoint handler.
 		c.Next()
 
+		// If there are no errors in the context, just exit and do nothing.
 		if len(c.Errors) == 0 {
 			return
 		}
 
+		// If there were errors, get the last error that happened
 		err := c.Errors.Last()
+
+		// Log the error using zap logger
 		logger.Error("Request error", zap.Error(err.Err))
 
-		// Handle custom API errors
+		// Check if the error is a custom APIError type
 		if apiErr, ok := err.Err.(*errors.APIError); ok {
+			// Get the HTTP status code from the custom error
 			statusCode := apiErr.StatusCode()
-			utils.RespondWithError(c, statusCode, getMessageForStatusCode(statusCode), apiErr.ToResponse())
+
+			// Respond with a proper error message, using a helper function
+			utils.RespondWithError(c,
+				statusCode,                          // HTTP status code like 400, 401, etc.
+				getMessageForStatusCode(statusCode), // A readable error message string
+				apiErr.ToResponse())                 // The full error response
 			return
 		}
 
-		// Handle generic errors
-		utils.RespondWithInternalError(c, constants.StatusInternalServerError, map[string]string{
-			"type":    string(errors.ErrorTypeInternal),
-			"message": err.Error(),
-		})
+		// If it's not a custom API error, treat it as an internal server error (generic case)
+		utils.RespondWithInternalError(c,
+			constants.StatusInternalServerError,
+			map[string]string{ // Build a basic error response
+				"type":    string(errors.ErrorTypeInternal), // error type like "internal"
+				"message": err.Error(),                      // the error message
+			})
 	}
 }
 

@@ -1,4 +1,3 @@
-// Package errors provides custom error types and handling for the API Gateway
 package errors
 
 import (
@@ -6,7 +5,7 @@ import (
 	"net/http"
 )
 
-// ErrorType represents the category of an error
+// ErrorType is a custom type to categorize different kinds of errors
 type ErrorType string
 
 // Define error types
@@ -21,23 +20,26 @@ const (
 	ErrorTypeRateLimited        ErrorType = "RATE_LIMITED"
 )
 
-// APIError represents a standard API error
+// APIError is a struct that represents an error in a standard format for APIs
 type APIError struct {
-	Type    ErrorType   `json:"type"`
-	Message string      `json:"message"`
-	Details interface{} `json:"details,omitempty"`
-	Err     error       `json:"-"` // Internal error, not exposed
+	Type    ErrorType   `json:"type"`              // The type of error (e.g., BAD_REQUEST)
+	Message string      `json:"message"`           // A human-readable message describing the error
+	Details interface{} `json:"details,omitempty"` // Optional extra information about the error
+	Err     error       `json:"-"`                 // The original error (hidden in JSON responses), not exposed
 }
 
-// Error implements the error interface
+// This method allows APIError to satisfy Go's built-in `error` interface
 func (e *APIError) Error() string {
+	// If an internal error exists, include it in the error string
 	if e.Err != nil {
 		return fmt.Sprintf("%s: %s - %v", e.Type, e.Message, e.Err)
 	}
+
+	// If there's no internal error, return only the type and message
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
-// StatusCode returns the HTTP status code for this error
+// StatusCode returns the correct HTTP status code based on the error type
 func (e *APIError) StatusCode() int {
 	switch e.Type {
 	case ErrorTypeValidation, ErrorTypeBadRequest:
@@ -57,19 +59,21 @@ func (e *APIError) StatusCode() int {
 	}
 }
 
-// ToResponse formats the error for API response
+// ToResponse converts the APIError into a map that can be easily converted to JSON for API responses
 func (e *APIError) ToResponse() map[string]interface{} {
+	// Basic structure of the response
 	response := map[string]interface{}{
 		"type":    string(e.Type),
 		"message": e.Message,
 	}
+	// Include details if they exist
 	if e.Details != nil {
 		response["details"] = e.Details
 	}
 	return response
 }
 
-// New creates a new APIError
+// New creates a new APIError with the given type, message, and internal error
 func New(errorType ErrorType, message string, err error) *APIError {
 	return &APIError{
 		Type:    errorType,

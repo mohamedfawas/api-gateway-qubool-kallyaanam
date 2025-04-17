@@ -1,4 +1,3 @@
-// Package models provides data models for the API Gateway
 package models
 
 import "time"

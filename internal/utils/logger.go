@@ -1,4 +1,3 @@
-// Package utils provides utility functions for the API Gateway
 package utils
 
 import (
